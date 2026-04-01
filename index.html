@@ -3,22 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <title>Космическа игра - Classroom</title>
-   <h3>📱 Сканирай за играта</h3>
+      <h3>📱 Сканирай за играта</h3>
 <img src="planeti1.jpg" width="200">
+
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 <style>
-body {
-  font-family: Arial;
-  text-align: center;
-  background: linear-gradient(black, darkblue);
-  color: white;
-}
-#planets { display:flex; justify-content:center; gap:15px; margin:20px; }
-.planet-box { text-align:center; }
-.planet { width:80px; }
-button { padding:10px; margin:5px; }
+body {font-family: Arial;text-align: center;background: linear-gradient(black, darkblue);color: white;}
+#planets {display:flex;justify-content:center;gap:15px;margin:20px;}
+.planet-box {text-align:center;}
+.planet {width:80px;}
+button {padding:10px;margin:5px;}
 </style>
 </head>
 <body>
@@ -27,7 +23,9 @@ button { padding:10px; margin:5px; }
 
 <input id="name" placeholder="Име">
 <button onclick="joinGame()">Влез</button>
-<button onclick="startGameTeacher()">🧑‍🏫 Старт</button>
+<button id="startBtn" onclick="startGameTeacher()">🧑‍🏫 Старт</button>
+
+<h2 id="countdown"></h2>
 
 <h3>👥 Влезли ученици</h3>
 <ul id="players"></ul>
@@ -54,10 +52,11 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-let correctOrder = ["mercury","venus","earth","mars","jupiter","saturn","uranus","neptune"];
+let correctOrder=["mercury","venus","earth","mars","jupiter","saturn","uranus","neptune"];
 let startTime;
 let playerName="";
 let gameStarted=false;
+let sortableInstance;
 
 const planetsData=[
  {name:"mercury",label:"Меркурий",img:"https://upload.wikimedia.org/wikipedia/commons/4/4a/Mercury_in_true_color.jpg"},
@@ -82,7 +81,10 @@ function renderPlanets(){
   d.innerHTML=`<img src="${p.img}" class="planet"><div>${p.label}</div>`;
   c.appendChild(d);
  });
- Sortable.create(c,{animation:150});
+
+ // първоначално НЕ може да се влачи
+ if(sortableInstance) sortableInstance.destroy();
+ sortableInstance = Sortable.create(c,{animation:150,disabled:true});
 }
 
 renderPlanets();
@@ -91,14 +93,47 @@ function joinGame(){
  playerName=document.getElementById("name").value||"Играч";
  db.ref("players").push({name:playerName});
  document.getElementById("result").innerText="Изчакай старт";
+
+ // скрива бутона старт за учениците
+ document.getElementById("startBtn").style.display="none";
 }
 
 function startGameTeacher(){
  db.ref("scores").remove();
- db.ref("game/start").set(Date.now());
+ db.ref("game/countdown").set(3);
 }
 
-// показва играчите
+// отброяване
+db.ref("game/countdown").on("value",snap=>{
+ let val=snap.val();
+ if(val===null) return;
+
+ let el=document.getElementById("countdown");
+
+ if(val>0){
+  el.innerText=val;
+  setTimeout(()=>{
+    db.ref("game/countdown").set(val-1);
+  },1000);
+ } else {
+  el.innerText="🚀 СТАРТ!";
+  db.ref("game/start").set(Date.now());
+ }
+});
+
+// старт
+db.ref("game/start").on("value",snap=>{
+ if(snap.val()){
+  gameStarted=true;
+  startTime=Date.now();
+  renderPlanets();
+
+  // разрешаваме влачене
+  sortableInstance.option("disabled", false);
+ }
+});
+
+// играчи
 db.ref("players").on("value",snap=>{
  let data=snap.val();
  let list=document.getElementById("players");
@@ -109,16 +144,6 @@ db.ref("players").on("value",snap=>{
   li.innerText=p.name;
   list.appendChild(li);
  });
-});
-
-// старт
-db.ref("game/start").on("value",snap=>{
- if(snap.val()){
-  gameStarted=true;
-  startTime=Date.now();
-  renderPlanets();
-  document.getElementById("result").innerText="🚀 Старт!";
- }
 });
 
 function checkOrder(){
