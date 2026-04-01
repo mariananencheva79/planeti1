@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Космическа игра - Classroom</title>
-      <h3>📱 Сканирай за играта</h3>
+<h3>📱 Сканирай за играта</h3>
 <img src="planeti1.jpg" width="200">
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -38,6 +38,9 @@ button {padding:10px;margin:5px;}
 <ul id="leaderboard"></ul>
 
 <script>
+// 👉 проверка дали си учител (по линк)
+const isTeacher = window.location.search.includes("teacher=1");
+
 const firebaseConfig = {
   apiKey: "AIzaSyDyHmGKUIon2R-xgb9k7R_5-mYSV4K86B0",
   authDomain: "planeti-5f523.firebaseapp.com",
@@ -50,6 +53,11 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
+
+// 👉 скриваме бутона ако НЕ си учител
+if(!isTeacher){
+ document.getElementById("startBtn").style.display="none";
+}
 
 let correctOrder=["mercury","venus","earth","mars","jupiter","saturn","uranus","neptune"];
 let startTime;
@@ -81,7 +89,6 @@ function renderPlanets(){
   c.appendChild(d);
  });
 
- // първоначално НЕ може да се влачи
  if(sortableInstance) sortableInstance.destroy();
  sortableInstance = Sortable.create(c,{animation:150,disabled:true});
 }
@@ -92,31 +99,33 @@ function joinGame(){
  playerName=document.getElementById("name").value||"Играч";
  db.ref("players").push({name:playerName});
  document.getElementById("result").innerText="Изчакай старт";
-
- // скрива бутона старт за учениците
- document.getElementById("startBtn").style.display="none";
 }
 
 function startGameTeacher(){
+ if(!isTeacher) return;
  db.ref("scores").remove();
+ db.ref("players").remove();
  db.ref("game/countdown").set(3);
 }
 
-// отброяване
+// отброяване (само учителят контролира)
 db.ref("game/countdown").on("value",snap=>{
  let val=snap.val();
  if(val===null) return;
-
  let el=document.getElementById("countdown");
 
  if(val>0){
   el.innerText=val;
-  setTimeout(()=>{
-    db.ref("game/countdown").set(val-1);
-  },1000);
+  if(isTeacher){
+    setTimeout(()=>{
+      db.ref("game/countdown").set(val-1);
+    },1000);
+  }
  } else {
   el.innerText="🚀 СТАРТ!";
-  db.ref("game/start").set(Date.now());
+  if(isTeacher){
+    db.ref("game/start").set(Date.now());
+  }
  }
 });
 
@@ -126,8 +135,6 @@ db.ref("game/start").on("value",snap=>{
   gameStarted=true;
   startTime=Date.now();
   renderPlanets();
-
-  // разрешаваме влачене
   sortableInstance.option("disabled", false);
  }
 });
