@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8">
+<title>Космическа игра - Classroom</title>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+<style>
+body {
+  font-family: Arial;
+  text-align: center;
+  background: linear-gradient(black, darkblue);
+  color: white;
+}
+#planets { display:flex; justify-content:center; gap:15px; margin:20px; }
+.planet-box { text-align:center; }
+.planet { width:80px; }
+button { padding:10px; margin:5px; }
+</style>
+</head>
+<body>
+
+<h1>🌍 Космическа игра</h1>
+
+<input id="name" placeholder="Име">
+<button onclick="joinGame()">Влез</button>
+<button onclick="startGameTeacher()">🧑‍🏫 Старт</button>
+
+<h3>👥 Влезли ученици</h3>
+<ul id="players"></ul>
+
+<div id="planets"></div>
+
+<button onclick="checkOrder()">Провери</button>
+<h2 id="result"></h2>
+
+<h3>🏆 Класиране</h3>
+<ul id="leaderboard"></ul>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDyHmGKUIon2R-xgb9k7R_5-mYSV4K86B0",
+  authDomain: "planeti-5f523.firebaseapp.com",
+  databaseURL: "https://planeti-5f523-default-rtdb.firebaseio.com",
+  projectId: "planeti-5f523",
+  storageBucket: "planeti-5f523.appspot.com",
+  messagingSenderId: "536339595743",
+  appId: "1:536339595743:web:565ada41c2a9848830446a"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+let correctOrder = ["mercury","venus","earth","mars","jupiter","saturn","uranus","neptune"];
+let startTime;
+let playerName="";
+let gameStarted=false;
+
+const planetsData=[
+ {name:"mercury",label:"Меркурий",img:"https://upload.wikimedia.org/wikipedia/commons/4/4a/Mercury_in_true_color.jpg"},
+ {name:"venus",label:"Венера",img:"https://upload.wikimedia.org/wikipedia/commons/e/e5/Venus-real_color.jpg"},
+ {name:"earth",label:"Земя",img:"https://upload.wikimedia.org/wikipedia/commons/9/97/The_Earth_seen_from_Apollo_17.jpg"},
+ {name:"mars",label:"Марс",img:"https://upload.wikimedia.org/wikipedia/commons/0/02/OSIRIS_Mars_true_color.jpg"},
+ {name:"jupiter",label:"Юпитер",img:"https://upload.wikimedia.org/wikipedia/commons/e/e2/Jupiter.jpg"},
+ {name:"saturn",label:"Сатурн",img:"https://upload.wikimedia.org/wikipedia/commons/c/c7/Saturn_during_Equinox.jpg"},
+ {name:"uranus",label:"Уран",img:"https://upload.wikimedia.org/wikipedia/commons/3/3d/Uranus2.jpg"},
+ {name:"neptune",label:"Нептун",img:"https://upload.wikimedia.org/wikipedia/commons/5/56/Neptune_Full.jpg"}
+];
+
+function shuffle(a){return a.sort(()=>Math.random()-0.5);}
+
+function renderPlanets(){
+ let c=document.getElementById("planets");
+ c.innerHTML="";
+ shuffle(planetsData).forEach(p=>{
+  let d=document.createElement("div");
+  d.className="planet-box";
+  d.dataset.name=p.name;
+  d.innerHTML=`<img src="${p.img}" class="planet"><div>${p.label}</div>`;
+  c.appendChild(d);
+ });
+ Sortable.create(c,{animation:150});
+}
+
+renderPlanets();
+
+function joinGame(){
+ playerName=document.getElementById("name").value||"Играч";
+ db.ref("players").push({name:playerName});
+ document.getElementById("result").innerText="Изчакай старт";
+}
+
+function startGameTeacher(){
+ db.ref("scores").remove();
+ db.ref("game/start").set(Date.now());
+}
+
+// показва играчите
+db.ref("players").on("value",snap=>{
+ let data=snap.val();
+ let list=document.getElementById("players");
+ list.innerHTML="";
+ if(!data) return;
+ Object.values(data).forEach(p=>{
+  let li=document.createElement("li");
+  li.innerText=p.name;
+  list.appendChild(li);
+ });
+});
+
+// старт
+db.ref("game/start").on("value",snap=>{
+ if(snap.val()){
+  gameStarted=true;
+  startTime=Date.now();
+  renderPlanets();
+  document.getElementById("result").innerText="🚀 Старт!";
+ }
+});
+
+function checkOrder(){
+ if(!gameStarted) return alert("Изчакай старт!");
+ let arr=[...document.querySelectorAll(".planet-box")].map(p=>p.dataset.name);
+ if(JSON.stringify(arr)===JSON.stringify(correctOrder)){
+  let t=((Date.now()-startTime)/1000).toFixed(2);
+  db.ref("scores").push({name:playerName,time:t});
+  document.getElementById("result").innerText="✅ Успя за "+t;
+ }else{
+  document.getElementById("result").innerText="🔥 Грешка";
+ }
+}
+
+// класиране
+db.ref("scores").on("value",snap=>{
+ let data=snap.val();
+ let list=document.getElementById("leaderboard");
+ list.innerHTML="";
+ if(!data) return;
+ let arr=Object.values(data);
+ arr.sort((a,b)=>a.time-b.time);
+ arr.slice(0,5).forEach(s=>{
+  let li=document.createElement("li");
+  li.innerText=s.name+" - "+s.time+" сек";
+  list.appendChild(li);
+ });
+});
+
+</script>
+
+</body>
+</html>
